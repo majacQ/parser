@@ -10107,6 +10107,19 @@ class TestParser < Minitest::Test
       SINCE_3_0)
   end
 
+  def test_endless_comparison_method
+    %i[=== == != <= >= !=].each do |method_name|
+      assert_parses(
+        s(:def, method_name,
+          s(:args,
+            s(:arg, :other)),
+          s(:send, nil, :do_something)),
+        %Q{def #{method_name}(other) = do_something},
+        %q{},
+        SINCE_3_0)
+    end
+  end
+
   def test_endless_method_without_args
     assert_parses(
       s(:def, :foo,
@@ -10157,5 +10170,54 @@ class TestParser < Minitest::Test
       %q{<<~HERE!  #{}!HERE}.gsub('!', "\n"),
       %q{},
       SINCE_2_3)
+  end
+
+  def test_pin_expr
+    assert_parses_pattern_match(
+      s(:in_pattern,
+        s(:pin,
+          s(:begin,
+            s(:int, 42))), nil,
+        s(:nil)),
+      %q{in ^(42) then nil},
+      %q{   ~ selector (in_pattern.pin)
+        |   ~~~~~ expression (in_pattern.pin)
+        |    ~ begin (in_pattern.pin.begin)
+        |       ~ end (in_pattern.pin.begin)
+        |    ~~~~ expression (in_pattern.pin.begin)},
+      SINCE_3_1)
+
+    assert_parses_pattern_match(
+      s(:in_pattern,
+        s(:hash_pattern,
+          s(:pair,
+            s(:sym, :foo),
+            s(:pin,
+              s(:begin,
+                s(:int, 42))))), nil,
+        s(:nil)),
+      %q{in { foo: ^(42) } then nil},
+      %q{          ~ selector (in_pattern.hash_pattern.pair.pin)
+        |          ~~~~~ expression (in_pattern.hash_pattern.pair.pin)
+        |           ~ begin (in_pattern.hash_pattern.pair.pin.begin)
+        |              ~ end (in_pattern.hash_pattern.pair.pin.begin)
+        |           ~~~~ expression (in_pattern.hash_pattern.pair.pin.begin)},
+      SINCE_3_1)
+
+    assert_parses_pattern_match(
+      s(:in_pattern,
+        s(:pin,
+          s(:begin,
+            s(:send,
+              s(:int, 0), :+,
+              s(:int, 0)))), nil,
+        s(:nil)),
+      %q{in ^(0+0) then nil},
+      %q{   ~ selector (in_pattern.pin)
+        |   ~~~~~~ expression (in_pattern.pin)
+        |    ~ begin (in_pattern.pin.begin)
+        |        ~ end (in_pattern.pin.begin)
+        |    ~~~~~ expression (in_pattern.pin.begin)},
+      SINCE_3_1)
   end
 end
